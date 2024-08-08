@@ -7,6 +7,8 @@ function App() {
     const [message, setMessage] = useState("");
     const [users, setUsers] = useState([]);
     const [privateMessage, setPrivateMessage] = useState({});
+    const [privateChats, setPrivateChats] = useState({}); // To track private conversations
+    const [sessionId, setSessionId] = useState(""); // To store the current user's session ID
 
     const joinRoom = () => {
         const client = new Client('ws://localhost:2567');
@@ -14,6 +16,7 @@ function App() {
         client.joinOrCreate('my_room').then(room => {
             console.log('Joined successfully!', room);
             setRoom(room);
+            setSessionId(room.sessionId); // Store the session ID
 
             room.onMessage('chat_message', (messageData) => {
                 console.log('Message received:', messageData);
@@ -22,7 +25,12 @@ function App() {
 
             room.onMessage('private_message', (messageData) => {
                 console.log('Private message received:', messageData);
-                setMessages(prevMessages => [...prevMessages, { user: `${messageData.user} (private)`, text: messageData.text }]);
+                
+                // Append the message to the private chat with the sender
+                setPrivateChats(prevChats => ({
+                    ...prevChats,
+                    [messageData.user]: [...(prevChats[messageData.user] || []), messageData.text]
+                }));
             });
 
             room.onMessage('player_list', (playerList) => {
@@ -42,9 +50,19 @@ function App() {
     };
 
     const sendPrivateMessage = (userId) => {
-        if (room && privateMessage[userId]?.trim() !== "") {
-            room.send('private_message', { userId, text: privateMessage[userId] });
+        if (room && userId !== sessionId && privateMessage[userId]?.trim() !== "") { // Check if user is not sending to themselves
+            const messageText = privateMessage[userId];
+            room.send('private_message', { userId, text: messageText });
+            
+            // Append the message to the private chat with the recipient
+            setPrivateChats(prevChats => ({
+                ...prevChats,
+                [userId]: [...(prevChats[userId] || []), `You: ${messageText}`]
+            }));
+
             setPrivateMessage({ ...privateMessage, [userId]: "" });
+        } else {
+            console.log("Cannot send private message to yourself.");
         }
     };
 
@@ -58,15 +76,27 @@ function App() {
                         {users.map((user, index) => (
                             <li key={index}>
                                 {user}
-                                <input 
-                                    type="text" 
-                                    value={privateMessage[user] || ""}
-                                    onChange={(e) => setPrivateMessage({ ...privateMessage, [user]: e.target.value })}
-                                    onKeyPress={(e) => {
-                                        if (e.key === 'Enter') sendPrivateMessage(user);
-                                    }}
-                                />
-                                <button onClick={() => sendPrivateMessage(user)}>Send Private</button>
+                                {user !== sessionId && (
+                                    <>
+                                        <input 
+                                            type="text" 
+                                            value={privateMessage[user] || ""}
+                                            onChange={(e) => setPrivateMessage({ ...privateMessage, [user]: e.target.value })}
+                                            onKeyPress={(e) => {
+                                                if (e.key === 'Enter') sendPrivateMessage(user);
+                                            }}
+                                        />
+                                        <button onClick={() => sendPrivateMessage(user)}>Send Private</button>
+                                        <div className="private-chat-box">
+                                            <h4>Chat with {user}</h4>
+                                            <div>
+                                                {(privateChats[user] || []).map((msg, idx) => (
+                                                    <div key={idx}>{msg}</div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
                             </li>
                         ))}
                     </ul>
