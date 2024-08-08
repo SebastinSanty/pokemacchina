@@ -37,20 +37,43 @@ class MyRoom extends Room {
         this.onMessage('chat_message', (client, message) => {
             console.log(`Received message from ${client.sessionId}: ${message}`);
             
-            // Add message to state and broadcast to all clients
+            // Add only the message text to the state and broadcast it
             this.state.messages.push(message);
-            this.broadcast('chat_message', message);
+            this.broadcast('chat_message', {
+                user: client.sessionId,
+                text: message,
+            });
+        });
+
+        // Register a message handler for 'private_message'
+        this.onMessage('private_message', (client, message) => {
+            console.log(`Received private message from ${client.sessionId} to ${message.userId}: ${message.text}`);
+            
+            // Send the private message to the intended recipient
+            const recipient = this.clients.find(c => c.sessionId === message.userId);
+            if (recipient) {
+                recipient.send('private_message', {
+                    user: client.sessionId,
+                    text: message.text,
+                });
+            }
         });
     }
 
     onJoin(client, options) {
         this.state.players.set(client.sessionId, new Player());
         console.log(client.sessionId, 'joined!');
+
+        // Broadcast updated player list
+        this.broadcast('player_list', Array.from(this.state.players.keys()));
     }
 
     onLeave(client, consented) {
         this.state.players.delete(client.sessionId);
         console.log(client.sessionId, 'left!');
+
+        // Broadcast updated player list
+        this.broadcast('player_list', Array.from(this.state.players.keys()));
     }
 
     onDispose() {

@@ -6,6 +6,7 @@ function App() {
     const [messages, setMessages] = useState([]);
     const [message, setMessage] = useState("");
     const [users, setUsers] = useState([]);
+    const [privateMessage, setPrivateMessage] = useState({});
 
     const joinRoom = () => {
         const client = new Client('ws://localhost:2567');
@@ -17,6 +18,11 @@ function App() {
             room.onMessage('chat_message', (messageData) => {
                 console.log('Message received:', messageData);
                 setMessages(prevMessages => [...prevMessages, messageData]);
+            });
+
+            room.onMessage('private_message', (messageData) => {
+                console.log('Private message received:', messageData);
+                setMessages(prevMessages => [...prevMessages, { user: `${messageData.user} (private)`, text: messageData.text }]);
             });
 
             room.onMessage('player_list', (playerList) => {
@@ -35,6 +41,13 @@ function App() {
         }
     };
 
+    const sendPrivateMessage = (userId) => {
+        if (room && privateMessage[userId]?.trim() !== "") {
+            room.send('private_message', { userId, text: privateMessage[userId] });
+            setPrivateMessage({ ...privateMessage, [userId]: "" });
+        }
+    };
+
     return (
         <div className="App">
             <h1>Chat Application</h1>
@@ -43,7 +56,18 @@ function App() {
                     <h2>Connected Users</h2>
                     <ul>
                         {users.map((user, index) => (
-                            <li key={index}>{user}</li>
+                            <li key={index}>
+                                {user}
+                                <input 
+                                    type="text" 
+                                    value={privateMessage[user] || ""}
+                                    onChange={(e) => setPrivateMessage({ ...privateMessage, [user]: e.target.value })}
+                                    onKeyPress={(e) => {
+                                        if (e.key === 'Enter') sendPrivateMessage(user);
+                                    }}
+                                />
+                                <button onClick={() => sendPrivateMessage(user)}>Send Private</button>
+                            </li>
                         ))}
                     </ul>
                     <div>
