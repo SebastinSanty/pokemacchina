@@ -1,14 +1,12 @@
-
-
 import React, { useState } from 'react';
 import { Client } from 'colyseus.js';
-import { Button, TextInput, Paper, Group, Text, Box, Stack, Title } from '@mantine/core';
+import { Button, TextInput, Paper, Group, Text, Box, Stack, Title, Grid } from '@mantine/core';
 
 import './App.css'
 
 import '@mantine/core/styles.css';
 
-import { MantineProvider } from '@mantine/core';
+import { createTheme, MantineProvider } from '@mantine/core';
 
 function App() {
   const [room, setRoom] = useState(null);
@@ -36,7 +34,7 @@ function App() {
               console.log('Private message received:', messageData);
               setPrivateChats(prevChats => ({
                   ...prevChats,
-                  [messageData.user]: [...(prevChats[messageData.user] || []), messageData.text]
+                  [messageData.user]: [...(prevChats[messageData.user] || []), { user: messageData.user, text: messageData.text }]
               }));
           });
 
@@ -51,7 +49,7 @@ function App() {
 
   const sendMessage = () => {
       if (room && message.trim() !== "") {
-          room.send('chat_message', message);
+          room.send('chat_message', { user: sessionId, text: message });
           setMessage("");
       }
   };
@@ -62,7 +60,7 @@ function App() {
           room.send('private_message', { userId, text: messageText });
           setPrivateChats(prevChats => ({
               ...prevChats,
-              [userId]: [...(prevChats[userId] || []), `You: ${messageText}`]
+              [userId]: [...(prevChats[userId] || []), { user: sessionId, text: messageText }]
           }));
           setPrivateMessage({ ...privateMessage, [userId]: "" });
       } else {
@@ -72,62 +70,80 @@ function App() {
 
   return (
     <MantineProvider>
-      <Box sx={{ padding: '20px' }}>
+      <Box >
           <Title order={1}>Pokémacchina</Title>
           {room ? (
-              <Group align="start" spacing="xl">
-                  <Box>
-                      <Title order={2}>Connected Users</Title>
-                      <Stack spacing="sm">
+              <>
+                  <Box mt={20}>
+                      <Title order={2}>People</Title>
+                      <Grid my={10}>
                           {users.map((user, index) => (
-                              <Paper key={index} shadow="xl" radius="xl" withBorder p="xl">
-                                  <Text>{user}</Text>
-                                  {user !== sessionId && (
-                                      <>
-                                          <TextInput
-                                              placeholder={`Message ${user}`}
-                                              value={privateMessage[user] || ""}
-                                              onChange={(e) => setPrivateMessage({ ...privateMessage, [user]: e.target.value })}
-                                              onKeyPress={(e) => {
-                                                  if (e.key === 'Enter') sendPrivateMessage(user);
-                                              }}
-                                          />
-                                          <Button
-                                              mt="xs"
-                                              size="xs"
-                                              variant="light"
-                                              onClick={() => sendPrivateMessage(user)}
-                                          >
-                                              Send Private
-                                          </Button>
-                                          <Box mt="xs" style={{ backgroundColor: '#f8f9fa', padding: '10px', borderRadius: '5px' }}>
-                                              <Text weight={500}>Chat with {user}</Text>
-                                              <Stack spacing="xs">
-                                                  {(privateChats[user] || []).map((msg, idx) => (
-                                                      <Text key={idx} size="sm">{msg}</Text>
-                                                  ))}
-                                              </Stack>
-                                          </Box>
-                                      </>
-                                  )}
+                            user !== sessionId && (
+                            <Grid.Col span={3} key={index}>
+                              <Paper shadow="xl" radius="md" withBorder p="sm">
+                                  <Box mt="xs" style={{ backgroundColor: '#f8f9fa', padding: '10px', borderRadius: '5px' }}>
+                                      <Text weight={500}>Talk with {user}</Text>
+                                      <Stack spacing="xs">
+                                          {(privateChats[user] || []).map((msg, idx) => (
+                                              <Box key={idx} style={{
+                                                  padding: '10px',
+                                                  backgroundColor: msg.user === sessionId ? '#0084ff' : '#e9ecef',
+                                                  color: msg.user === sessionId ? 'white' : 'black',
+                                                  borderRadius: '10px',
+                                                  alignSelf: msg.user === sessionId ? 'flex-end' : 'flex-start',
+                                                  maxWidth: '80%',
+                                                  marginBottom: '5px'
+                                              }}>
+                                                  <Text size="sm">{msg.text}</Text>
+                                              </Box>
+                                          ))}
+                                      </Stack>
+                                      <Group mt="md">
+                                        <TextInput
+                                            placeholder={`Message ${user}`}
+                                            value={privateMessage[user] || ""}
+                                            onChange={(e) => setPrivateMessage({ ...privateMessage, [user]: e.target.value })}
+                                            onKeyPress={(e) => {
+                                                if (e.key === 'Enter') sendPrivateMessage(user);
+                                            }}
+                                            style={{ flex: 1 }}
+                                        />
+                                        <Button
+                                            size="sm"
+                                            variant="light"
+                                            onClick={() => sendPrivateMessage(user)}
+                                        >
+                                            Send
+                                        </Button>
+                                      </Group>
+                                  </Box>
                               </Paper>
+                              </Grid.Col>
+                            )
                           ))}
-                      </Stack>
+                      </Grid>
                   </Box>
 
-                  <Box sx={{ flex: 1 }}>
+                  <Box  mt={20} sx={{ flex: 1 }}>
                       <Title order={2}>Public Chat</Title>
-                      <Paper shadow="sm" padding="md" withBorder>
+                      <Paper shadow="xl" radius="md" withBorder p="sm" >
                           <Stack spacing="sm">
                               {messages.map((msg, index) => (
-                                  <Box key={index} style={{ padding: '10px', backgroundColor: '#e9ecef', borderRadius: '5px' }}>
+                                  <Box key={index} style={{
+                                      padding: '10px',
+                                      backgroundColor: msg.user === sessionId ? '#0084ff' : '#e9ecef',
+                                      color: msg.user === sessionId ? 'white' : 'black',
+                                      borderRadius: '10px',
+                                      alignSelf: msg.user === sessionId ? 'flex-end' : 'flex-start',
+                                      maxWidth: '80%',
+                                      marginBottom: '5px'
+                                  }}>
                                       <Text weight={500}>{msg.user}:</Text>
                                       <Text>{msg.text}</Text>
                                   </Box>
                               ))}
                           </Stack>
-                      </Paper>
-                      <Group mt="md">
+                          <Group mt="md">
                           <TextInput
                               placeholder="Type your message"
                               value={message}
@@ -139,15 +155,17 @@ function App() {
                           />
                           <Button onClick={sendMessage}>Send</Button>
                       </Group>
+                      </Paper>
+                      
                   </Box>
-              </Group>
+              </>
           ) : (
               <Button onClick={joinRoom}>Join Room</Button>
           )}
       </Box>
-      </MantineProvider>
-  );
+    </MantineProvider>
+  )
+
 }
 
 export default App;
-

@@ -37,13 +37,16 @@ class MyRoom extends Room {
         this.onMessage('chat_message', (client, message) => {
             console.log(`Received message from ${client.sessionId}: ${message}`);
             
-            // Add only the message text to the state and broadcast it
-            this.state.messages.push(message);
+            // Push only the message text to the state
+            this.state.messages.push(message.text);  // Only push the text, not the entire object
+            
+            // Broadcast the full message object (with user and text)
             this.broadcast('chat_message', {
                 user: client.sessionId,
-                text: message,
+                text: message.text,
             });
         });
+        
 
         // Register a message handler for 'private_message'
         this.onMessage('private_message', (client, message) => {
