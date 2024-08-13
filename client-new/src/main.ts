@@ -7,6 +7,8 @@ import { colyseusSDK } from './utils/Colyseus.js';
 import type { MyRoomState, Player } from "../../server-new/src/rooms/MyRoom.js";
 import { authenticate } from './utils/Auth.js';
 import { PlayerObject } from './objects/PlayerObject.js';
+
+import { Input, Button } from '@pixi/ui';
 // import { lerp } from './utils/MathUtils.js';
 
 const RESOLUTION = 4;
@@ -140,32 +142,104 @@ const RESOLUTION = 4;
 
   // Create the proximity box and add it to the stage, but hide it initially
   function createProximityBox(): PIXI.Graphics {
+    const boxWidth = 100;
+    const boxHeight = 140;
+    const padding = 5;
+    const fontSize = 8;
+  
     const box = new PIXI.Graphics()
-    .rect(0, 0, 200, 100)
-    .fill(0xff0000)
-    
-    const text = new PIXI.Text({
-      text: "You are near another player!",
-      style: {
-        fontSize: 18,
-        fill: 0xffffff, // White text
-      }
+      .roundRect(0, 0, boxWidth, boxHeight, 5)
+      .fill(0x90a4ae);
+  
+    const text = new PIXI.Text("Chat with nearby user", {
+      fontSize: fontSize,
+      fill: 0x000000,
+      wordWrap: true,
+      wordWrapWidth: boxWidth - padding * 2
     });
-    text.position.set(10, 10); // Set some padding inside the box
+    text.position.set(padding, padding);
     box.addChild(text);
 
-    box.visible = false;
 
-    box.position.x = app.screen.width / (RESOLUTION * 2);
-    box.position.y = app.screen.height / (RESOLUTION * 2);
+  
+
+    const placeholder = 'Enter Message'
+    const align = 'left'
+    const textColor = '#000000'
+    const backgroundColor = '#F1D583'
+    const borderColor = '#DCB000'
+    const maxLength = 20
+    const fontSizeI = 5
+    const border = 1
+    const height = 15
+    const width = boxWidth - height*0.9 - height*0.9
+    const radius = 4
+    const amount = 1
+    const paddingTop = 0
+    const paddingRight = 0
+    const paddingBottom = 0
+    const paddingLeft = 5
+    const cleanOnFocus = true
+    const addMask = false
+
+    const textip = new Input({
+                    bg: new PIXI.Graphics()
+                        .roundRect(0, 0, width, height, radius + border)
+                        .fill(borderColor)
+                        .roundRect(border, border, width - (border * 2), height - (border * 2), radius)
+                        .fill(backgroundColor),
+                    textStyle: {
+                        fill: textColor,
+                        fontSize: fontSizeI,
+                    },
+                    maxLength,
+                    align,
+                    placeholder,
+                    value: '',
+                    padding: [paddingTop, paddingRight, paddingBottom, paddingLeft],
+                    cleanOnFocus,
+                    addMask
+                });
 
     
-  // Add a custom property to the box to store the text object
-  (box as any).proximityText = text;
 
-  app.stage.addChild(box);
+    
+  
+    // Prevent default behavior on enter key
+    textip.on('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        // Here you can add custom behavior for when Enter is pressed
+        console.log('Enter pressed, input value:', textip.value);
+      }
+    });
+  
+    box.visible = false;
+    box.position.set(
+      app.screen.width / (RESOLUTION * 2) - boxWidth / 2,
+      app.screen.height / (RESOLUTION * 2) - boxHeight / 2
+    );
 
-  return box;
+    textip.position.set(padding, boxHeight - height - padding);
+    box.addChild(textip);
+
+
+    const button = new Button(
+      new PIXI.Graphics().roundRect(0, 0, height*0.9, height*0.9, height*0.9)
+      .fill('#A5E24D')
+    );
+
+    button.view.position.set(boxWidth-padding-height*0.9, boxHeight - height*0.95 - padding);
+    
+    button.onPress.connect(() => console.log('onPress'));
+
+    box.addChild(button.view);
+  
+    // Add a custom property to the box to store the text object
+    (box as any).proximityText = text;
+    app.stage.addChild(box);
+  
+    return box;
   }
 
 
@@ -246,25 +320,25 @@ const RESOLUTION = 4;
    * Keyboard events
    */
   window.addEventListener("keydown", (event) => {
-    if (event.key === "ArrowUp" || event.key === "w") {
+    if (event.key === "ArrowUp") {
       keys.up = true;
-    } else if (event.key === "ArrowDown" || event.key === "s") {
+    } else if (event.key === "ArrowDown") {
       keys.down = true;
-    } else if (event.key === "ArrowLeft" || event.key === "a") {
+    } else if (event.key === "ArrowLeft") {
       keys.left = true;
-    } else if (event.key === "ArrowRight" || event.key === "d") {
+    } else if (event.key === "ArrowRight") {
       keys.right = true;
     }
   });
 
   window.addEventListener("keyup", (event) => {
-    if (event.key === "ArrowUp" || event.key === "w") {
+    if (event.key === "ArrowUp") {
       keys.up = false;
-    } else if (event.key === "ArrowDown" || event.key === "s") {
+    } else if (event.key === "ArrowDown") {
       keys.down = false;
-    } else if (event.key === "ArrowLeft" || event.key === "a") {
+    } else if (event.key === "ArrowLeft") {
       keys.left = false;
-    } else if (event.key === "ArrowRight" || event.key === "d") {
+    } else if (event.key === "ArrowRight") {
       keys.right = false;
     }
   });
