@@ -101,7 +101,7 @@ const RESOLUTION = 4;
   let playerSprites = new Map<Player, PIXI.Container>();
 
   const PROXIMITY_THRESHOLD = 50; // Set a distance threshold for proximity
-  let proximityBox: PIXI.Graphics;
+  // let proximityBox: PIXI.Graphics;
 
   try {
     /**
@@ -144,11 +144,6 @@ const RESOLUTION = 4;
     .rect(0, 0, 200, 100)
     .fill(0xff0000)
     
-    // Replace deprecated fill with a modern approach using beginFill and draw methods
-    // box.beginFill(0x000000, 0.7); // Start fill with black color and 0.7 opacity
-    // box.drawRect(0, 0, 200, 100); // Draw rectangle
-    // box.endFill(); // End fill
-    
     const text = new PIXI.Text({
       text: "You are near another player!",
       style: {
@@ -164,65 +159,19 @@ const RESOLUTION = 4;
     box.position.x = app.screen.width / (RESOLUTION * 2);
     box.position.y = app.screen.height / (RESOLUTION * 2);
 
-    app.stage.addChild(box);
-    return box;
-}
+    
+  // Add a custom property to the box to store the text object
+  (box as any).proximityText = text;
+
+  app.stage.addChild(box);
+
+  return box;
+  }
 
 
 
   // Initialize the proximity box
-  proximityBox = createProximityBox();
-
-// const box = new PIXI.Graphics()
-//     .rect(0, 0, 200, 100)
-//     .fill(0xff0000)
-    
-//     // Replace deprecated fill with a modern approach using beginFill and draw methods
-//     // box.beginFill(0x000000, 0.7); // Start fill with black color and 0.7 opacity
-//     // box.drawRect(0, 0, 200, 100); // Draw rectangle
-//     // box.endFill(); // End fill
-    
-//     const text = new PIXI.Text({
-//       text: "You are near another player!",
-//       style: {
-//         fontSize: 18,
-//         fill: 0xffffff, // White text
-//       }
-//     });
-//     text.position.set(10, 10); // Set some padding inside the box
-//     box.addChild(text);
-
-//     // box.visible = false;
-
-//     // box.position.x = app.screen.width / 2 - 100
-//     // box.position.y = app.screen.height / 2 - 50
-
-
-//     // box.position.x = app.screen.width / (RESOLUTION * 2);
-//     // box.position.y = app.screen.height / (RESOLUTION * 2);
-
-//     app.stage.addChild(box);
-
-
-  // const error = new PIXI.Text({
-  //   anchor: 0.5,
-  //   text: "Yolo",
-  //   style: {
-  //     fontSize: 18,
-  //     fill: 0xff0000,
-  //     stroke: 0x000000,
-  //   }
-  // });
-  // error.position.x = app.screen.width / (RESOLUTION * 2);
-  // error.position.y = app.screen.height / (RESOLUTION * 2);
-
-  // app.stage.addChild(error);
-
-  // const randoma = new PIXI.Graphics()
-  // .rect(0, 0, 200, 100)
-  // .fill(0xff0000);
-
-  // app.stage.addChild(randoma);
+  let proximityBox = createProximityBox();
 
 
 
@@ -323,66 +272,61 @@ const RESOLUTION = 4;
   /**
    * Main Game Loop
    */
-  app.ticker.add((time) => {
-    TweenJS.update(app.ticker.lastTime);
+  // Main Game Loop
+app.ticker.add((time) => {
+  TweenJS.update(app.ticker.lastTime);
 
-    if (localPlayer) {
-      if (keys.up) {
-        localPlayer.position.y -= 1;
-      } else if (keys.down) {
-        localPlayer.position.y += 1;
-      }
-
-      if (keys.left) {
-        localPlayer.position.x -= 1;
-      } else if (keys.right) {
-        localPlayer.position.x += 1;
-      }
-
-      // Calculate the distance to other players and show the proximity box if close
-      let closeToAnotherPlayer = false;
-
-      playerSprites.forEach((sprite, player) => {
-        if (sprite === localPlayer) return;
-
-        const dx = localPlayer.position.x - sprite.position.x;
-        const dy = localPlayer.position.y - sprite.position.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-
-        if (distance < PROXIMITY_THRESHOLD) {
-          closeToAnotherPlayer = true;
-        }
-      });
-
-      // Show or hide the proximity box
-      if (closeToAnotherPlayer) {
-        proximityBox.visible = true;
-    //   box.position.x = app.screen.width / (RESOLUTION * 2);
-    // box.position.y = app.screen.height / (RESOLUTION * 2);
-        proximityBox.position.set(app.screen.width / (RESOLUTION * 2), app.screen.height / (RESOLUTION * 2));
-      } else {
-        proximityBox.visible = false;
-      }
-
-      // console.log('Proximity Box Visible:', closeToAnotherPlayer);
-
-
-      // /**
-      //  * Interpolate other players
-      //  */
-      // playerSprites.forEach((sprite, player) => {
-      //   if (sprite === localPlayer) { return; }
-      //   sprite.position.x = lerp(sprite.position.x, player.position.x, 0.2);
-      //   sprite.position.y = lerp(sprite.position.y, player.position.y, 0.2);
-      // });
-
-      // Client-authoritative positioning
-      room.send("move", {
-        x: localPlayer.position.x,
-        y: localPlayer.position.y
-      })
+  if (localPlayer) {
+    if (keys.up) {
+      localPlayer.position.y -= 1;
+    } else if (keys.down) {
+      localPlayer.position.y += 1;
     }
 
-  });
+    if (keys.left) {
+      localPlayer.position.x -= 1;
+    } else if (keys.right) {
+      localPlayer.position.x += 1;
+    }
+
+    // Calculate the closest player
+    let closestPlayer: Player | null = null;
+    let minDistance = PROXIMITY_THRESHOLD;
+
+    playerSprites.forEach((sprite, player) => {
+      if (sprite === localPlayer) return;
+
+      const dx = localPlayer.position.x - sprite.position.x;
+      const dy = localPlayer.position.y - sprite.position.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance < minDistance) {
+        minDistance = distance;
+        closestPlayer = player;
+      }
+    });
+
+    // Show or hide the proximity box
+    if (closestPlayer) {
+      proximityBox.visible = true;
+
+      // Update the proximity text
+      (proximityBox as any).proximityText.text = `Chat with ${closestPlayer.username || 'another player'}`;
+
+      proximityBox.position.set(
+        localPlayer.position.x + 50, // Adjust position based on player position
+        localPlayer.position.y - 50  // Adjust position based on player position
+      );
+    } else {
+      proximityBox.visible = false;
+    }
+
+    // Client-authoritative positioning
+    room.send("move", {
+      x: localPlayer.position.x,
+      y: localPlayer.position.y
+    });
+  }
+});
 
 })();
