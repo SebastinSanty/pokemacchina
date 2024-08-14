@@ -7,3 +7,43 @@ html, body {
 canvas {
   display: block;
 }
+
+/* style.css */
+/* body {
+  margin: 0;
+  overflow: hidden;
+  font-family: Arial, sans-serif;
+} */
+/* style.css */
+.chat-message {
+  display: flex;
+  margin-bottom: 10px;
+  max-width: 60%;
+  word-wrap: break-word;
+}
+
+.chat-message.other {
+  justify-content: flex-start;
+}
+
+.chat-message.self {
+  justify-content: flex-end;
+}
+
+.chat-bubble {
+  padding: 8px 12px;
+  border-radius: 20px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.chat-bubble.other {
+  background-color: #e4e6eb;
+  color: #050505;
+}
+
+.chat-bubble.self {
+  background-color: #0084ff;
+  color: #ffffff;
+}
+

@@ -101,6 +101,9 @@ const RESOLUTION = 4;
    */
   let localPlayer: PIXI.Container; // we will use this to store the local player
   let playerSprites = new Map<Player, PIXI.Container>();
+  let chatHistory: HTMLDivElement | null = null;
+  const PADDING = 5; // Define a constant padding value globally
+
 
   const PROXIMITY_THRESHOLD = 50; // Set a distance threshold for proximity
   // let proximityBox: PIXI.Graphics;
@@ -140,12 +143,54 @@ const RESOLUTION = 4;
     channelId: discordSDK.channelId // join by channel ID
   });
 
+  let chatMessages: Array<{ user: string; text: string }> = [];
+
+// Function to send chat messages
+function sendMessage(message: string) {
+  console.log("Sent Message: ", message)
+  if (room) {
+    room.send('chat_message', { user: room.sessionId, text: message });
+  }
+}
+
+// Listen for incoming chat messages
+room.onMessage('chat_message', (messageData) => {
+  console.log("On Message: ", messageData)
+  chatMessages.push(messageData);
+  updateChatHistory();
+});
+
+// Update the chat history display
+function updateChatHistory() {
+  // Ensure chatHistory is not null before proceeding
+  if (proximityBox && chatHistory) {
+    chatHistory.innerHTML = ""; // Clear existing content
+
+    chatMessages.slice(-5).forEach((msg) => {
+      const isSelf = msg.user === room.sessionId; // Check if the message was sent by the current user
+      const messageElement = document.createElement("div");
+      messageElement.className = `chat-message ${isSelf ? "self" : "other"}`;
+
+      const bubbleElement = document.createElement("div");
+      bubbleElement.className = `chat-bubble ${isSelf ? "self" : "other"}`;
+      bubbleElement.innerText = msg.text;
+
+      messageElement.appendChild(bubbleElement);
+      chatHistory.appendChild(messageElement);
+    });
+  }
+}
+
+
+
+
+
   // Create the proximity box and add it to the stage, but hide it initially
   function createProximityBox(): PIXI.Graphics {
     const boxWidth = 100;
     const boxHeight = 140;
     const padding = 5;
-    const fontSize = 8;
+    const fontSize = 5;
   
     const box = new PIXI.Graphics()
       .roundRect(0, 0, boxWidth, boxHeight, 5)
@@ -160,6 +205,32 @@ const RESOLUTION = 4;
     text.position.set(padding, padding);
     box.addChild(text);
 
+
+    // const chatHistory = new PIXI.Text("", {
+    //   fontSize: fontSize-1,
+    //   fill: 0x000000,
+    //   wordWrap: true,
+    //   wordWrapWidth: boxWidth - padding * 2,
+    // });
+    // chatHistory.position.set(padding, padding*5);
+    // box.addChild(chatHistory);
+
+
+    const chatHistoryContainer = new PIXI.Container();
+chatHistoryContainer.position.set(padding, padding * 5);
+box.addChild(chatHistoryContainer);
+
+chatHistory = document.createElement("div");
+  chatHistory.style.position = "absolute";
+  chatHistory.style.width = `590px`; // Set width to the full width of the box
+  chatHistory.style.height = `1200px`; // Adjust height as needed (subtract space for text and input)
+  chatHistory.style.paddingTop = "35px"; // Add padding to the chat history
+  chatHistory.style.paddingLeft = "20px"; // Add padding to the chat history
+  chatHistory.style.overflowY = "auto"; // Add scroll if necessary
+  chatHistory.style.pointerEvents = "none"; // Ensure it doesn't interfere with PIXI.js interactivity
+  chatHistory.style.background = "transparent"; // Ensure it has a transparent background
+
+  document.body.appendChild(chatHistory);
 
   
 
@@ -201,18 +272,9 @@ const RESOLUTION = 4;
                     addMask
                 });
 
-    
 
+                
     
-  
-    // Prevent default behavior on enter key
-    textip.on('keydown', (e: KeyboardEvent) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        // Here you can add custom behavior for when Enter is pressed
-        console.log('Enter pressed, input value:', textip.value);
-      }
-    });
   
     box.visible = false;
     box.position.set(
@@ -221,7 +283,7 @@ const RESOLUTION = 4;
     );
 
     textip.position.set(padding, boxHeight - height - padding);
-    box.addChild(textip);
+    
 
 
     const button = new Button(
@@ -231,12 +293,23 @@ const RESOLUTION = 4;
 
     button.view.position.set(boxWidth-padding-height*0.9, boxHeight - height*0.95 - padding);
     
-    button.onPress.connect(() => console.log('onPress'));
+    button.onPress.connect(() => {
+      if (textip.value.trim() !== "") {
+        sendMessage(textip.value.trim());
+        textip.value = ''; // Clear input after sending
+      }
+    });
 
+    
+  
+    box.addChild(textip);
     box.addChild(button.view);
   
     // Add a custom property to the box to store the text object
     (box as any).proximityText = text;
+
+    (box as any).chatHistory = chatHistory;
+
     app.stage.addChild(box);
   
     return box;
@@ -347,60 +420,73 @@ const RESOLUTION = 4;
    * Main Game Loop
    */
   // Main Game Loop
-app.ticker.add((time) => {
-  TweenJS.update(app.ticker.lastTime);
-
-  if (localPlayer) {
-    if (keys.up) {
-      localPlayer.position.y -= 1;
-    } else if (keys.down) {
-      localPlayer.position.y += 1;
-    }
-
-    if (keys.left) {
-      localPlayer.position.x -= 1;
-    } else if (keys.right) {
-      localPlayer.position.x += 1;
-    }
-
-    // Calculate the closest player
-    let closestPlayer: Player | null = null;
-    let minDistance = PROXIMITY_THRESHOLD;
-
-    playerSprites.forEach((sprite, player) => {
-      if (sprite === localPlayer) return;
-
-      const dx = localPlayer.position.x - sprite.position.x;
-      const dy = localPlayer.position.y - sprite.position.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-
-      if (distance < minDistance) {
-        minDistance = distance;
-        closestPlayer = player;
+  app.ticker.add((time) => {
+    TweenJS.update(app.ticker.lastTime);
+  
+    if (localPlayer) {
+      if (keys.up) {
+        localPlayer.position.y -= 1;
+      } else if (keys.down) {
+        localPlayer.position.y += 1;
       }
-    });
-
-    // Show or hide the proximity box
-    if (closestPlayer) {
-      proximityBox.visible = true;
-
-      // Update the proximity text
-      (proximityBox as any).proximityText.text = `Chat with ${closestPlayer.username || 'another player'}`;
-
-      proximityBox.position.set(
-        localPlayer.position.x + 50, // Adjust position based on player position
-        localPlayer.position.y - 50  // Adjust position based on player position
-      );
+  
+      if (keys.left) {
+        localPlayer.position.x -= 1;
+      } else if (keys.right) {
+        localPlayer.position.x += 1;
+      }
+  
+      let closestPlayer: Player | null = null;
+      let minDistance = PROXIMITY_THRESHOLD;
+  
+      playerSprites.forEach((sprite, player) => {
+        if (sprite === localPlayer) return;
+  
+        const dx = localPlayer.position.x - sprite.position.x;
+        const dy = localPlayer.position.y - sprite.position.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+  
+        if (distance < minDistance) {
+          minDistance = distance;
+          closestPlayer = player;
+        }
+      });
+  
+      if (closestPlayer) {
+        proximityBox.visible = true;
+        (proximityBox as any).proximityText.text = `Chat with ${closestPlayer.username || 'another player'}`;
+    
+        const boxX = localPlayer.position.x + 50;
+        const boxY = localPlayer.position.y - 50;
+        proximityBox.position.set(boxX, boxY);
+    
+        // Convert PIXI.js coordinates to screen coordinates
+        const rect = app.view.getBoundingClientRect();
+        const globalX = rect.left + proximityBox.position.x * RESOLUTION;
+        const globalY = rect.top + proximityBox.position.y * RESOLUTION;
+    
+        // Update the chatHistory position relative to the proximity box
+        if (chatHistory) {
+            chatHistory.style.left = `${globalX + PADDING}px`;
+            chatHistory.style.top = `${globalY + 20}px`; // Adjust top position to align with the text and input
+            chatHistory.style.display = 'block'; // Make sure the chat history is visible
+        }
     } else {
-      proximityBox.visible = false;
+        proximityBox.visible = false;
+    
+        // Hide the chatHistory when no player is close
+        if (chatHistory) {
+            chatHistory.style.display = 'none';
+        }
     }
-
-    // Client-authoritative positioning
-    room.send("move", {
-      x: localPlayer.position.x,
-      y: localPlayer.position.y
-    });
-  }
-});
+    
+  
+      room.send("move", {
+        x: localPlayer.position.x,
+        y: localPlayer.position.y
+      });
+    }
+  });
+  
 
 })();

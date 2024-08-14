@@ -29,6 +29,9 @@ export class MyRoom extends Room<MyRoomState> {
     console.log('Room created!');
     this.setState(new MyRoomState());
 
+    // Add a fake user to the room with a username that follows the format of real users
+    this.addFakeUser();
+
     // Register a message handler for 'move'
     this.onMessage("move", (client, message) => {
       const player = this.state.players.get(client.sessionId);
@@ -67,11 +70,29 @@ export class MyRoom extends Room<MyRoomState> {
     });
   }
 
+  addFakeUser() {
+    const fakeSessionId = this.generateNumericSessionId();
+    const fakePlayer = new Player();
+    fakePlayer.username = `#User ${fakeSessionId}`;
+    fakePlayer.heroType = Math.floor(Math.random() * 12) + 1;
+    fakePlayer.position.x = Math.floor(Math.random() * 100);
+    fakePlayer.position.y = Math.floor(Math.random() * 100);
+
+    this.state.players.set(fakeSessionId, fakePlayer);
+
+    console.log(`${fakePlayer.username} has been added to the room!`);
+  }
+
+  generateNumericSessionId() {
+    // Generate an 8-digit numeric session ID
+    return Math.floor(10000000 + Math.random() * 90000000).toString();
+  }
+
   onJoin(client: Client, options: any) {
     console.log(client.sessionId, 'joined!');
     
     const player = new Player();
-    player.username = client.auth?.username || "Guest";
+    player.username = client.auth?.username || `#User ${client.sessionId}`;
     player.heroType = Math.floor(Math.random() * 12) + 1;
     player.position.x = Math.floor(Math.random() * 100);
     player.position.y = Math.floor(Math.random() * 100);
@@ -93,3 +114,6 @@ export class MyRoom extends Room<MyRoomState> {
     console.log('Room disposed!');
   }
 }
+
+
+
