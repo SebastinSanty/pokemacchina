@@ -1,6 +1,10 @@
 import { JWT } from "@colyseus/auth";
 import { Room, Client } from "@colyseus/core";
 import { Schema, MapSchema, type } from "@colyseus/schema";
+import dotenv from 'dotenv';
+import axios, { AxiosError } from 'axios';  // Import Axios
+
+dotenv.config();
 
 export class Vec2 extends Schema {
   @type("number") x: number;
@@ -42,16 +46,25 @@ export class MyRoom extends Room<MyRoomState> {
     });
 
     // Register a message handler for 'chat_message'
-    this.onMessage('chat_message', (client, message) => {
+    this.onMessage('chat_message', async (client, message) => {
       console.log(`Received message from ${client.sessionId}: ${message.text}`);
-      
+
       // Push only the message text to the state
       this.state.messages.push(message.text);  // Only push the text, not the entire object
-      
+
       // Broadcast the full message object (with user and text)
       this.broadcast('chat_message', {
         user: client.sessionId,
         text: message.text,
+      });
+
+      // Send the message to ChatGPT API and get the response
+      const chatGptResponse = await this.getChatGptResponse(message.text);
+
+      // Broadcast the ChatGPT response as the fake user
+      this.broadcast('chat_message', {
+        user: 'Bot', // Username of the fake user
+        text: chatGptResponse,
       });
     });
 
@@ -70,10 +83,54 @@ export class MyRoom extends Room<MyRoomState> {
     });
   }
 
+  async getChatGptResponse(userMessage: string): Promise<string> {
+    const maxRetries = 3;  // Maximum number of retries
+    const baseDelay = 1000; // Base delay in milliseconds
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+            const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+                model: 'gpt-3.5-turbo',  // Adjust the model as necessary
+                messages: [
+                    { role: 'system', content: 'You are a friendly and helpful bot in a multiplayer game.' },
+                    { role: 'user', content: userMessage }
+                ],
+                max_tokens: 50  // Adjust the response length as needed
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,  // Use the API key from environment variables
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            return response.data.choices[0].message.content.trim();
+        } catch (error) {
+            if (axios.isAxiosError(error)) {  // Check if the error is an AxiosError
+                if (error.response && error.response.status === 429) {
+                    const delay = baseDelay * Math.pow(2, attempt); // Exponential backoff
+                    console.warn(`Rate limited by OpenAI. Retrying in ${delay}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                } else {
+                    console.error('Error calling ChatGPT API:', error.message);
+                    return "Sorry, I couldn't understand that. Could you please rephrase?";
+                }
+            } else {
+                console.error('An unexpected error occurred:', error);
+                return "Sorry, something went wrong. Please try again later.";
+            }
+        }
+    }
+
+    return "Sorry, I'm having trouble responding right now. Please try again later.";
+}
+
+
+
   addFakeUser() {
     const fakeSessionId = this.generateNumericSessionId();
     const fakePlayer = new Player();
-    fakePlayer.username = `#User ${fakeSessionId}`;
+    // fakePlayer.username = `#User ${fakeSessionId}`;
+    fakePlayer.username = `Bot`;
     fakePlayer.heroType = Math.floor(Math.random() * 12) + 1;
     fakePlayer.position.x = Math.floor(Math.random() * 100);
     fakePlayer.position.y = Math.floor(Math.random() * 100);
@@ -114,6 +171,3 @@ export class MyRoom extends Room<MyRoomState> {
     console.log('Room disposed!');
   }
 }
-
-
-
