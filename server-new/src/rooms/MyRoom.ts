@@ -24,10 +24,7 @@ export class MyRoomState extends Schema {
 
 export class MyRoom extends Room<MyRoomState> {
   maxClients = 4;
-
-  static onAuth(token: string) {
-    return JWT.verify(token);
-  }
+  private aiPrompt: string = 'You are a friendly and helpful bot in a multiplayer game.'; // Initial AI prompt
 
   onCreate(options: any) {
     console.log('Room created!');
@@ -68,6 +65,12 @@ export class MyRoom extends Room<MyRoomState> {
       });
     });
 
+    // Register a message handler for updating the AI prompt
+    this.onMessage('update_prompt', (client, message) => {
+      this.aiPrompt = message.prompt;
+      console.log(`AI Prompt updated to: ${this.aiPrompt}`);
+    });
+
     // Register a message handler for 'private_message'
     this.onMessage('private_message', (client, message) => {
       console.log(`Received private message from ${client.sessionId} to ${message.userId}: ${message.text}`);
@@ -92,7 +95,7 @@ export class MyRoom extends Room<MyRoomState> {
             const response = await axios.post('https://api.openai.com/v1/chat/completions', {
                 model: 'gpt-3.5-turbo',  // Adjust the model as necessary
                 messages: [
-                    { role: 'system', content: 'You are a friendly and helpful bot in a multiplayer game.' },
+                    { role: 'system', content: this.aiPrompt },
                     { role: 'user', content: userMessage }
                 ],
                 max_tokens: 50  // Adjust the response length as needed
@@ -122,9 +125,7 @@ export class MyRoom extends Room<MyRoomState> {
     }
 
     return "Sorry, I'm having trouble responding right now. Please try again later.";
-}
-
-
+  }
 
   addFakeUser() {
     const fakeSessionId = this.generateNumericSessionId();
@@ -147,17 +148,24 @@ export class MyRoom extends Room<MyRoomState> {
 
   onJoin(client: Client, options: any) {
     console.log(client.sessionId, 'joined!');
-    
+  
+    // Check if the client is the editor
+    if (options.isEditor) {
+      console.log('Editor client connected, not creating a new player.');
+      return; // Skip creating a new player for the editor client
+    }
+  
+    // Create a new player for regular clients
     const player = new Player();
     player.username = client.auth?.username || `#User ${client.sessionId}`;
     player.heroType = Math.floor(Math.random() * 12) + 1;
     player.position.x = Math.floor(Math.random() * 100);
     player.position.y = Math.floor(Math.random() * 100);
     this.state.players.set(client.sessionId, player);
-
+  
     // Broadcast updated player list
     this.broadcast('player_list', Array.from(this.state.players.keys()));
-  }
+  }  
 
   onLeave(client: Client, consented: boolean) {
     console.log(client.sessionId, 'left!');

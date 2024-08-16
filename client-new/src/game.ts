@@ -2,10 +2,8 @@ import './style.css'
 import * as PIXI from "pixi.js";
 import TweenJS, { Easing, Tween } from "@tweenjs/tween.js";
 
-import { discordSDK } from './utils/DiscordSDK.js';
 import { colyseusSDK } from './utils/Colyseus.js';
 import type { MyRoomState, Player } from "../../server-new/src/rooms/MyRoom.js";
-import { authenticate } from './utils/Auth.js';
 import { PlayerObject } from './objects/PlayerObject.js';
 
 import { Input, Button } from '@pixi/ui';
@@ -108,39 +106,10 @@ export async function initGame() {
   const PROXIMITY_THRESHOLD = 50; // Set a distance threshold for proximity
   // let proximityBox: PIXI.Graphics;
 
-  try {
-    /**
-     * Authenticate with Discord and get Colyseus JWT token
-     */
-    const authData = await authenticate();
-
-    // Assign the token to authenticate with Colyseus (Room's onAuth)
-    colyseusSDK.auth.token = authData.token;
-
-  } catch (e) {
-    console.error("Failed to authenticate", e);
-
-    const error = new PIXI.Text({
-      anchor: 0.5,
-      text: "Failed to authenticate.",
-      style: {
-        fontSize: 18,
-        fill: 0xff0000,
-        stroke: 0x000000,
-      }
-    });
-    error.position.x = app.screen.width / (RESOLUTION * 2);
-    error.position.y = app.screen.height / (RESOLUTION * 2);
-
-    app.stage.addChild(error);
-    return;
-  }
-
   /**
    * Join the game room
    */
   const room = await colyseusSDK.joinOrCreate<MyRoomState>("my_room", {
-    channelId: discordSDK.channelId // join by channel ID
   });
 
   let chatMessages: Array<{ user: string; text: string }> = [];
