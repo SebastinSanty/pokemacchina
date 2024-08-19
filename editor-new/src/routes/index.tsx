@@ -14,7 +14,7 @@ const initialCode = `You are a friendly and helpful bot in a multiplayer game.`;
 export default function IndexPage() {
 
   const [code, setCode] = useState(initialCode);
-  const client = new Colyseus.Client('ws://localhost:2567'); // Adjust the WebSocket URL if needed
+  const client = new Colyseus.Client('/api'); // Adjust the WebSocket URL if needed
   const [room, setRoom] = useState<Colyseus.Room | null>(null);
 
   useEffect(() => {
