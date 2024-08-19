@@ -1,10 +1,9 @@
-// import { Link } from 'react-router-dom'
 import React, { useState, useEffect } from 'react';
 import * as Colyseus from 'colyseus.js';
 
 import { SignedIn, SignedOut, SignInButton, SignOutButton, UserButton } from '@clerk/clerk-react'
-import { Button, Box, Group, Text, Center, Container, Stack, Paper } from '@mantine/core'
-import { IconPlayerPlay } from '@tabler/icons-react'
+import { Button, Box, Group, Text, Center, Container, Stack, Paper, Loader } from '@mantine/core'
+import { IconPlayerPlay, IconCheck, IconAlertCircle } from '@tabler/icons-react'
 
 import CodeMirror from '@uiw/react-codemirror';
 import { vscodeDark } from "@uiw/codemirror-theme-vscode";
@@ -16,6 +15,8 @@ export default function IndexPage() {
   const [code, setCode] = useState(initialCode);
   const client = new Colyseus.Client('/api'); // Adjust the WebSocket URL if needed
   const [room, setRoom] = useState<Colyseus.Room | null>(null);
+  const [isLoading, setIsLoading] = useState(false); // State for loading spinner
+  const [runStatus, setRunStatus] = useState<'idle' | 'success' | 'error'>('idle'); // State for success/error
 
   useEffect(() => {
     // Join the room as an editor client as soon as the component mounts
@@ -39,13 +40,22 @@ export default function IndexPage() {
   };
   
   const handleRunCode = async () => {
+    setIsLoading(true);
+    setRunStatus('idle');
     console.log('Running code:', code);
     if (room) {
-      // Send the updated prompt to the server
-      room.send('update_prompt', { prompt: code });
+      try {
+        // Send the updated prompt to the server
+        await room.send('update_prompt', { prompt: code });
+        setRunStatus('success');
+      } catch (error) {
+        console.error('Failed to run code:', error);
+        setRunStatus('error');
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
-
 
   return (
     <header>
@@ -81,10 +91,16 @@ export default function IndexPage() {
       <Center>
         <Button
           size="sm"
-          leftSection={<IconPlayerPlay size={14}/>} 
+          leftSection={isLoading ? <Loader size={14} color="white" /> : 
+                       runStatus === 'success' ? <IconCheck size={14} /> : 
+                       runStatus === 'error' ? <IconAlertCircle size={14} color="yellow" /> : 
+                       <IconPlayerPlay size={14}/>} 
           onClick={handleRunCode}
+          variant={runStatus === 'error' ? 'outline' : 'filled'}
+          color={runStatus === 'error' ? 'yellow' : 'blue'}
+          disabled={isLoading}
         >
-          Run Code
+          {isLoading ? 'Running...' : 'Run Code'}
         </Button>
       </Center>
       

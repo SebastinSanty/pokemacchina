@@ -7,7 +7,10 @@ import type { MyRoomState, Player } from "../../server-new/src/rooms/MyRoom.js";
 import { PlayerObject } from './objects/PlayerObject.js';
 
 import { Input, Button } from '@pixi/ui';
+import { create } from 'domain';
 // import { lerp } from './utils/MathUtils.js';
+
+import 'bootstrap/dist/css/bootstrap.min.css';
 
 const RESOLUTION = 4;
 
@@ -104,7 +107,7 @@ export async function initGame() {
 
 
   const PROXIMITY_THRESHOLD = 50; // Set a distance threshold for proximity
-  // let proximityBox: PIXI.Graphics;
+  // let chatBox: PIXI.Graphics;
 
   /**
    * Join the game room
@@ -130,164 +133,142 @@ room.onMessage('chat_message', (messageData) => {
 });
 
 // Update the chat history display
-function updateChatHistory() {
-  // Ensure chatHistory is not null before proceeding
-  if (proximityBox && chatHistory) {
-    chatHistory.innerHTML = ""; // Clear existing content
+// function updateChatHistory() {
+//   // Ensure chatHistory is not null before proceeding
+//   if (chatBox && chatHistory) {
+//     chatHistory.innerHTML = ""; // Clear existing content
 
-    chatMessages.slice(-5).forEach((msg) => {
-      const isSelf = msg.user === room.sessionId; // Check if the message was sent by the current user
-      const messageElement = document.createElement("div");
-      messageElement.className = `chat-message ${isSelf ? "self" : "other"}`;
+//     chatMessages.slice(-5).forEach((msg) => {
+//       const isSelf = msg.user === room.sessionId; // Check if the message was sent by the current user
+//       const messageElement = document.createElement("div");
+//       messageElement.className = `chat-message ${isSelf ? "self" : "other"}`;
 
-      const bubbleElement = document.createElement("div");
-      bubbleElement.className = `chat-bubble ${isSelf ? "self" : "other"}`;
-      bubbleElement.innerText = msg.text;
+//       const bubbleElement = document.createElement("div");
+//       bubbleElement.className = `chat-bubble ${isSelf ? "self" : "other"}`;
+//       bubbleElement.innerText = msg.text;
 
-      messageElement.appendChild(bubbleElement);
-      chatHistory.appendChild(messageElement);
-    });
+//       messageElement.appendChild(bubbleElement);
+//       chatHistory.appendChild(messageElement);
+//     });
+//   }
+// }
+
+function createProximityBoxInstance() {
+  const boxWidth = 300;
+  const boxHeight = 400;
+  const padding = 5;
+  const fontSize = 12;
+
+  // Create the main container for the proximity box
+  const chatBox = document.createElement("div");
+  chatBox.className = "proximity-box card shadow mb-5 bg-light rounded";
+  chatBox.style.position = "absolute";
+  chatBox.style.width = `${boxWidth}px`;
+  chatBox.style.height = `${boxHeight}px`;
+  chatBox.style.visibility = "hidden"; // Initially hidden
+
+  // Make chatBoxBody a flex container
+  const chatBoxBody = document.createElement("div");
+  chatBoxBody.className = "card-body";
+  chatBoxBody.style.display = "flex";
+  chatBoxBody.style.flexDirection = "column";
+  chatBoxBody.style.height = "100%";
+  chatBox.appendChild(chatBoxBody);
+
+  const chatHeader = document.createElement("h6");
+  chatHeader.className = "proximity-text card-title";
+  chatHeader.innerText = "Chat with nearby user";
+  chatBoxBody.appendChild(chatHeader);
+
+  // Allow chatHistory to grow and shrink
+  const chatHistory = document.createElement("div");
+  chatHistory.style.flexGrow = "1";
+  chatHistory.style.overflowY = "auto";
+  chatHistory.className = "card-text";
+  chatBoxBody.appendChild(chatHistory);
+
+  const chatInputGroup = document.createElement("div");
+  chatInputGroup.className = "input-group input-group-sm mt-2";
+  chatBoxBody.appendChild(chatInputGroup);
+
+  const chatInput = document.createElement("input");
+  chatInput.type = "text";
+  chatInput.className = "form-control";
+  chatInput.placeholder = "Enter message";
+  chatInputGroup.appendChild(chatInput);
+
+  const sendButton = document.createElement("button");
+  sendButton.className = "btn btn-dark";
+  sendButton.innerText = "Send";
+  chatInputGroup.appendChild(sendButton);
+
+  document.body.appendChild(chatBox);
+
+  // Functionality for sending a message
+  sendButton.addEventListener("click", () => {
+      if (chatInput.value.trim() !== "") {
+          sendMessage(chatInput.value.trim());
+          chatInput.value = ''; // Clear input after sending
+      }
+  });
+
+  function updateChatHistory() {
+      chatHistory.innerHTML = ""; // Clear existing content
+      chatMessages.slice(-5).forEach((msg) => {
+          const isSelf = msg.user === room.sessionId;
+          const messageElement = document.createElement("div");
+
+          // Style the message bubble
+          messageElement.style.padding = "8px 12px";
+          messageElement.style.margin = "4px 0";
+          messageElement.style.borderRadius = "15px";
+          messageElement.style.maxWidth = "70%";
+          messageElement.style.fontSize = `12px`;
+          messageElement.style.wordWrap = "break-word"; // Ensure text wraps within the bubble
+          messageElement.style.width = "fit-content"; // Adjust the width based on content
+
+          if (isSelf) {
+              // Sent message styling (blue, right)
+              messageElement.style.backgroundColor = "#007bff"; // Blue background
+              messageElement.style.color = "white";
+              messageElement.style.alignSelf = "flex-end"; // Align to the right
+              messageElement.style.marginLeft = "auto"; // Ensure it's pushed to the right
+          } else {
+              // Received message styling (gray, left)
+              messageElement.style.backgroundColor = "#e9ecef"; // Gray background
+              messageElement.style.color = "black";
+              messageElement.style.alignSelf = "flex-start"; // Align to the left
+              messageElement.style.marginRight = "auto"; // Ensure it's pushed to the left
+          }
+
+          messageElement.innerText = msg.text;
+          chatHistory.appendChild(messageElement);
+      });
+
+      // Scroll to the bottom of chatHistory
+      chatHistory.scrollTop = chatHistory.scrollHeight;
   }
+
+  // Position and visibility of the proximity box using PIXI.js
+  chatBox.style.left = `${app.screen.width / (RESOLUTION * 2) - boxWidth / 2}px`;
+  chatBox.style.top = `${app.screen.height / (RESOLUTION * 2) - boxHeight / 2}px`;
+
+  return {
+      chatBox,
+      updateChatHistory,
+  };
 }
 
 
 
 
 
-  // Create the proximity box and add it to the stage, but hide it initially
-  function createProximityBox(): PIXI.Graphics {
-    const boxWidth = 100;
-    const boxHeight = 140;
-    const padding = 5;
-    const fontSize = 5;
-  
-    const box = new PIXI.Graphics()
-      .roundRect(0, 0, boxWidth, boxHeight, 5)
-      .fill(0x90a4ae);
-  
-    const text = new PIXI.Text("Chat with nearby user", {
-      fontSize: fontSize,
-      fill: 0x000000,
-      wordWrap: true,
-      wordWrapWidth: boxWidth - padding * 2
-    });
-    text.position.set(padding, padding);
-    box.addChild(text);
 
-
-    // const chatHistory = new PIXI.Text("", {
-    //   fontSize: fontSize-1,
-    //   fill: 0x000000,
-    //   wordWrap: true,
-    //   wordWrapWidth: boxWidth - padding * 2,
-    // });
-    // chatHistory.position.set(padding, padding*5);
-    // box.addChild(chatHistory);
-
-
-    const chatHistoryContainer = new PIXI.Container();
-chatHistoryContainer.position.set(padding, padding * 5);
-box.addChild(chatHistoryContainer);
-
-chatHistory = document.createElement("div");
-  chatHistory.style.position = "absolute";
-  chatHistory.style.width = `590px`; // Set width to the full width of the box
-  chatHistory.style.height = `1200px`; // Adjust height as needed (subtract space for text and input)
-  chatHistory.style.paddingTop = "35px"; // Add padding to the chat history
-  chatHistory.style.paddingLeft = "20px"; // Add padding to the chat history
-  chatHistory.style.overflowY = "auto"; // Add scroll if necessary
-  chatHistory.style.pointerEvents = "none"; // Ensure it doesn't interfere with PIXI.js interactivity
-  chatHistory.style.background = "transparent"; // Ensure it has a transparent background
-
-  document.body.appendChild(chatHistory);
-
-  
-
-    const placeholder = 'Enter Message'
-    const align = 'left'
-    const textColor = '#000000'
-    const backgroundColor = '#F1D583'
-    const borderColor = '#DCB000'
-    const maxLength = 20
-    const fontSizeI = 5
-    const border = 1
-    const height = 15
-    const width = boxWidth - height*0.9 - height*0.9
-    const radius = 4
-    const amount = 1
-    const paddingTop = 0
-    const paddingRight = 0
-    const paddingBottom = 0
-    const paddingLeft = 5
-    const cleanOnFocus = true
-    const addMask = false
-
-    const textip = new Input({
-                    bg: new PIXI.Graphics()
-                        .roundRect(0, 0, width, height, radius + border)
-                        .fill(borderColor)
-                        .roundRect(border, border, width - (border * 2), height - (border * 2), radius)
-                        .fill(backgroundColor),
-                    textStyle: {
-                        fill: textColor,
-                        fontSize: fontSizeI,
-                    },
-                    maxLength,
-                    align,
-                    placeholder,
-                    value: '',
-                    padding: [paddingTop, paddingRight, paddingBottom, paddingLeft],
-                    cleanOnFocus,
-                    addMask
-                });
-
-
-                
-    
-  
-    box.visible = false;
-    box.position.set(
-      app.screen.width / (RESOLUTION * 2) - boxWidth / 2,
-      app.screen.height / (RESOLUTION * 2) - boxHeight / 2
-    );
-
-    textip.position.set(padding, boxHeight - height - padding);
-    
-
-
-    const button = new Button(
-      new PIXI.Graphics().roundRect(0, 0, height*0.9, height*0.9, height*0.9)
-      .fill('#A5E24D')
-    );
-
-    button.view.position.set(boxWidth-padding-height*0.9, boxHeight - height*0.95 - padding);
-    
-    button.onPress.connect(() => {
-      if (textip.value.trim() !== "") {
-        sendMessage(textip.value.trim());
-        textip.value = ''; // Clear input after sending
-      }
-    });
-
-    
-  
-    box.addChild(textip);
-    box.addChild(button.view);
-  
-    // Add a custom property to the box to store the text object
-    (box as any).proximityText = text;
-
-    (box as any).chatHistory = chatHistory;
-
-    app.stage.addChild(box);
-  
-    return box;
-  }
-
-
+  let chatBoxInstance = createProximityBoxInstance();
 
   // Initialize the proximity box
-  let proximityBox = createProximityBox();
+  let chatBox = chatBoxInstance.chatBox;
+  let updateChatHistory = chatBoxInstance.updateChatHistory;
 
 
 
@@ -390,72 +371,79 @@ chatHistory = document.createElement("div");
    */
   // Main Game Loop
   app.ticker.add((time) => {
-    TweenJS.update(app.ticker.lastTime);
-  
-    if (localPlayer) {
-      if (keys.up) {
-        localPlayer.position.y -= 1;
-      } else if (keys.down) {
-        localPlayer.position.y += 1;
+  TweenJS.update(app.ticker.lastTime);
+
+  if (localPlayer) {
+    // Handle player movement based on key inputs
+    if (keys.up) {
+      localPlayer.position.y -= 1;
+    } else if (keys.down) {
+      localPlayer.position.y += 1;
+    }
+
+    if (keys.left) {
+      localPlayer.position.x -= 1;
+    } else if (keys.right) {
+      localPlayer.position.x += 1;
+    }
+
+    let closestPlayer = null;
+    let minDistance = PROXIMITY_THRESHOLD;
+
+    // Find the closest player within the proximity threshold
+    playerSprites.forEach((sprite, player) => {
+      if (sprite === localPlayer) return;
+
+      const dx = localPlayer.position.x - sprite.position.x;
+      const dy = localPlayer.position.y - sprite.position.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance < minDistance) {
+        minDistance = distance;
+        closestPlayer = player;
       }
-  
-      if (keys.left) {
-        localPlayer.position.x -= 1;
-      } else if (keys.right) {
-        localPlayer.position.x += 1;
+    });
+
+    if (closestPlayer) {
+      // Show the proximity box
+      chatBox.style.visibility = "visible";
+      chatBox.querySelector(".proximity-text").innerText = `Chat with ${closestPlayer.username || 'another player'}`;
+
+      // Calculate the position of the proximity box
+      const boxX = localPlayer.position.x + 50;
+      const boxY = localPlayer.position.y - 50;
+
+      // Convert PIXI.js coordinates to screen coordinates
+      const rect = app.view.getBoundingClientRect();
+      const globalX = rect.left + boxX * RESOLUTION;
+      const globalY = rect.top + boxY * RESOLUTION;
+
+      // Update the proximity box position
+      chatBox.style.left = `${globalX}px`;
+      chatBox.style.top = `${globalY}px`;
+
+      // Ensure chat history is visible
+      if (chatHistory) {
+        chatHistory.style.display = 'block';
       }
-  
-      let closestPlayer: Player | null = null;
-      let minDistance = PROXIMITY_THRESHOLD;
-  
-      playerSprites.forEach((sprite, player) => {
-        if (sprite === localPlayer) return;
-  
-        const dx = localPlayer.position.x - sprite.position.x;
-        const dy = localPlayer.position.y - sprite.position.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-  
-        if (distance < minDistance) {
-          minDistance = distance;
-          closestPlayer = player;
-        }
-      });
-  
-      if (closestPlayer) {
-        proximityBox.visible = true;
-        (proximityBox as any).proximityText.text = `Chat with ${closestPlayer.username || 'another player'}`;
-    
-        const boxX = localPlayer.position.x + 50;
-        const boxY = localPlayer.position.y - 50;
-        proximityBox.position.set(boxX, boxY);
-    
-        // Convert PIXI.js coordinates to screen coordinates
-        const rect = app.view.getBoundingClientRect();
-        const globalX = rect.left + proximityBox.position.x * RESOLUTION;
-        const globalY = rect.top + proximityBox.position.y * RESOLUTION;
-    
-        // Update the chatHistory position relative to the proximity box
-        if (chatHistory) {
-            chatHistory.style.left = `${globalX + PADDING}px`;
-            chatHistory.style.top = `${globalY + 20}px`; // Adjust top position to align with the text and input
-            chatHistory.style.display = 'block'; // Make sure the chat history is visible
-        }
     } else {
-        proximityBox.visible = false;
-    
-        // Hide the chatHistory when no player is close
-        if (chatHistory) {
-            chatHistory.style.display = 'none';
-        }
+      // Hide the proximity box when no player is close
+      chatBox.style.visibility = "hidden";
+
+      // Hide the chat history when no player is close
+      if (chatHistory) {
+        chatHistory.style.display = 'none';
+      }
     }
-    
-  
-      room.send("move", {
-        x: localPlayer.position.x,
-        y: localPlayer.position.y
-      });
-    }
-  });
+
+    // Send the player's new position to the server
+    room.send("move", {
+      x: localPlayer.position.x,
+      y: localPlayer.position.y
+    });
+  }
+});
+
   
 
 }
