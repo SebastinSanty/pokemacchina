@@ -115,7 +115,6 @@ export async function initGame() {
   const room = await colyseusSDK.joinOrCreate<MyRoomState>("my_room", {
   });
 
-  let chatMessages: Array<{ user: string; text: string }> = [];
 
 // Function to send chat messages
 function sendMessage(message: string) {
@@ -125,6 +124,20 @@ function sendMessage(message: string) {
   }
 }
 
+function getPlayerIdFromUsername(playerUsername: string) {
+  return playerUsername.split(' ').pop();
+}
+
+
+
+
+
+const activeChatBoxes = new Map<string, ReturnType<typeof createProximityBoxInstance>>(); // Store chat boxes by player username
+
+function getPlayerFromPlayerUsername(playerUsername: string) {
+  return room.state.players.find((player) => player.username === playerUsername);
+}
+
 // Listen for incoming chat messages
 room.onMessage('chat_message', (messageData) => {
   console.log("On Message: ", messageData)
@@ -132,28 +145,49 @@ room.onMessage('chat_message', (messageData) => {
   updateChatHistory();
 });
 
-// Update the chat history display
-// function updateChatHistory() {
-//   // Ensure chatHistory is not null before proceeding
-//   if (chatBox && chatHistory) {
-//     chatHistory.innerHTML = ""; // Clear existing content
+function handleOutgoingPrivateMessage(sendingPlayer, messageData) {
+  const { user: toPlayerId, text } = messageData;
 
-//     chatMessages.slice(-5).forEach((msg) => {
-//       const isSelf = msg.user === room.sessionId; // Check if the message was sent by the current user
-//       const messageElement = document.createElement("div");
-//       messageElement.className = `chat-message ${isSelf ? "self" : "other"}`;
+  const player = room.state.players.get(toPlayerId);
+  const playerUsername = player ? player.username : 'Unknown Player';
 
-//       const bubbleElement = document.createElement("div");
-//       bubbleElement.className = `chat-bubble ${isSelf ? "self" : "other"}`;
-//       bubbleElement.innerText = msg.text;
+  let chatBoxInstance = activeChatBoxes.get(player);
+  let chatMessages: Array<{ user: string; text: string }> = [];
 
-//       messageElement.appendChild(bubbleElement);
-//       chatHistory.appendChild(messageElement);
-//     });
-//   }
-// }
+  chatMessages.push({ user: sendingPlayer, text });
+  chatBoxInstance.updateChatHistory(chatMessages);
+}
 
-function createProximityBoxInstance() {
+function sendMessageToPlayer(playerUsername: string, message: string) {
+  const playerId = getPlayerIdFromUsername(playerUsername);
+  console.log("Sent Message: ", message, " to ", playerId)
+  if (room) {
+    room.send('private_message', { sendPlayerId: playerId, text: message });
+    handleOutgoingPrivateMessage(room.sessionId, { user: playerId, text: message });
+  }
+}
+
+// Function to handle incoming private messages
+function handleIncomingPrivateMessage(messageData) {
+  const { user: fromPlayerId, text } = messageData;
+
+  // Find the player object by sessionId to get the username (if needed)
+  const player = room.state.players.get(fromPlayerId);
+  const playerUsername = player ? player.username : 'Unknown Player';
+
+  // Check if a chat box already exists for this player
+  let chatBoxInstance = activeChatBoxes.get(player);
+  let chatMessages: Array<{ user: string; text: string }> = [];
+  
+  // Update the chat history with the new message
+  chatMessages.push({ user: fromPlayerId, text });
+  chatBoxInstance.updateChatHistory(chatMessages);
+}
+
+// Listen for incoming private messages
+room.onMessage('private_message', handleIncomingPrivateMessage);
+
+function createProximityBoxInstance(playerUsername: string) {
   const boxWidth = 300;
   const boxHeight = 400;
   const padding = 5;
@@ -177,7 +211,7 @@ function createProximityBoxInstance() {
 
   const chatHeader = document.createElement("h6");
   chatHeader.className = "proximity-text card-title";
-  chatHeader.innerText = "Chat with nearby user";
+  chatHeader.innerText = `Chat with ${playerUsername || 'another player'}`;
   chatBoxBody.appendChild(chatHeader);
 
   // Allow chatHistory to grow and shrink
@@ -207,14 +241,16 @@ function createProximityBoxInstance() {
   // Functionality for sending a message
   sendButton.addEventListener("click", () => {
       if (chatInput.value.trim() !== "") {
-          sendMessage(chatInput.value.trim());
+          sendMessageToPlayer(playerUsername, chatInput.value.trim());
           chatInput.value = ''; // Clear input after sending
       }
   });
 
-  function updateChatHistory() {
-      chatHistory.innerHTML = ""; // Clear existing content
-      chatMessages.slice(-5).forEach((msg) => {
+  function updateChatHistory(messages) {
+      // chatHistory.innerHTML = ""; // Clear existing content
+      messages.slice(-5).forEach((msg) => {
+          // console.log("Message: ", msg)
+          // console.log("Room Session ID: ", room.sessionId)
           const isSelf = msg.user === room.sessionId;
           const messageElement = document.createElement("div");
 
@@ -258,20 +294,6 @@ function createProximityBoxInstance() {
       updateChatHistory,
   };
 }
-
-
-
-
-
-
-  let chatBoxInstance = createProximityBoxInstance();
-
-  // Initialize the proximity box
-  let chatBox = chatBoxInstance.chatBox;
-  let updateChatHistory = chatBoxInstance.updateChatHistory;
-
-
-
 
   /**
    * On player join
@@ -370,80 +392,99 @@ function createProximityBoxInstance() {
    * Main Game Loop
    */
   // Main Game Loop
+
+ /**
+ * Proximity check and chat box creation function
+ */
+function manageProximityAndChatBoxes() {
+  // Map to store active chat boxes for each player
+
   app.ticker.add((time) => {
-  TweenJS.update(app.ticker.lastTime);
+    TweenJS.update(app.ticker.lastTime);
 
-  if (localPlayer) {
-    // Handle player movement based on key inputs
-    if (keys.up) {
-      localPlayer.position.y -= 1;
-    } else if (keys.down) {
-      localPlayer.position.y += 1;
-    }
-
-    if (keys.left) {
-      localPlayer.position.x -= 1;
-    } else if (keys.right) {
-      localPlayer.position.x += 1;
-    }
-
-    let closestPlayer = null;
-    let minDistance = PROXIMITY_THRESHOLD;
-
-    // Find the closest player within the proximity threshold
-    playerSprites.forEach((sprite, player) => {
-      if (sprite === localPlayer) return;
-
-      const dx = localPlayer.position.x - sprite.position.x;
-      const dy = localPlayer.position.y - sprite.position.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-
-      if (distance < minDistance) {
-        minDistance = distance;
-        closestPlayer = player;
+    if (localPlayer) {
+      // Handle player movement based on key inputs
+      if (keys.up) {
+        localPlayer.position.y -= 1;
+      } else if (keys.down) {
+        localPlayer.position.y += 1;
       }
-    });
 
-    if (closestPlayer) {
-      // Show the proximity box
-      chatBox.style.visibility = "visible";
-      chatBox.querySelector(".proximity-text").innerText = `Chat with ${closestPlayer.username || 'another player'}`;
-
-      // Calculate the position of the proximity box
-      const boxX = localPlayer.position.x + 50;
-      const boxY = localPlayer.position.y - 50;
-
-      // Convert PIXI.js coordinates to screen coordinates
-      const rect = app.view.getBoundingClientRect();
-      const globalX = rect.left + boxX * RESOLUTION;
-      const globalY = rect.top + boxY * RESOLUTION;
-
-      // Update the proximity box position
-      chatBox.style.left = `${globalX}px`;
-      chatBox.style.top = `${globalY}px`;
-
-      // Ensure chat history is visible
-      if (chatHistory) {
-        chatHistory.style.display = 'block';
+      if (keys.left) {
+        localPlayer.position.x -= 1;
+      } else if (keys.right) {
+        localPlayer.position.x += 1;
       }
-    } else {
-      // Hide the proximity box when no player is close
-      chatBox.style.visibility = "hidden";
 
-      // Hide the chat history when no player is close
-      if (chatHistory) {
-        chatHistory.style.display = 'none';
-      }
+      // Check proximity with all other players
+      playerSprites.forEach((sprite, player) => {
+        if (sprite === localPlayer) return;
+
+        const dx = localPlayer.position.x - sprite.position.x;
+        const dy = localPlayer.position.y - sprite.position.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance < PROXIMITY_THRESHOLD) {
+          // If close enough, create or update the chat box for this player
+          if (!activeChatBoxes.has(player)) {
+            console.log("Creating chat box for player: ", player.username);
+            const newChatBoxInstance = createProximityBoxInstance(player.username);
+            const chatBox = newChatBoxInstance.chatBox;
+
+            // Calculate position for the new chat box
+            const boxX = localPlayer.position.x + 30;
+            const boxY = localPlayer.position.y - 50;
+
+            // Convert PIXI.js coordinates to screen coordinates
+            const rect = app.view.getBoundingClientRect();
+            const globalX = rect.left + boxX * RESOLUTION;
+            const globalY = rect.top + boxY * RESOLUTION;
+
+            chatBox.style.left = `${globalX}px`;
+            chatBox.style.top = `${globalY}px`;
+
+            // Show the chat box and add it to the active chat boxes map
+            chatBox.style.visibility = "visible";
+            activeChatBoxes.set(player, newChatBoxInstance);
+
+            // Append the new chat box to the document body
+            document.body.appendChild(chatBox);
+          } else {
+            // Update the position of the existing chat box
+            const chatBoxInstance = activeChatBoxes.get(player)!;
+            const chatBox = chatBoxInstance.chatBox; 
+            chatBox.style.visibility = "visible";
+            const boxX = localPlayer.position.x + 30;
+            const boxY = localPlayer.position.y - 50;
+
+            // Convert PIXI.js coordinates to screen coordinates
+            const rect = app.view.getBoundingClientRect();
+            const globalX = rect.left + boxX * RESOLUTION;
+            const globalY = rect.top + boxY * RESOLUTION;
+
+            chatBox.style.left = `${globalX}px`;
+            chatBox.style.top = `${globalY}px`;
+          }
+        } else {
+          // If out of range, remove the chat box for this player
+          if (activeChatBoxes.has(player)) {
+            const chatBoxInstance = activeChatBoxes.get(player)!;
+            const chatBox = chatBoxInstance.chatBox;
+            chatBox.style.visibility = "hidden";
+          }
+        }
+      });
+
+      // Send the player's new position to the server
+      room.send("move", {
+        x: localPlayer.position.x,
+        y: localPlayer.position.y,
+      });
     }
+  });
+}
 
-    // Send the player's new position to the server
-    room.send("move", {
-      x: localPlayer.position.x,
-      y: localPlayer.position.y
-    });
-  }
-});
-
-  
+// Call the manageProximityAndChatBoxes function in your game initialization
+manageProximityAndChatBoxes();
 
 }

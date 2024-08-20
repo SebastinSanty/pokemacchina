@@ -43,27 +43,27 @@ export class MyRoom extends Room<MyRoomState> {
     });
 
     // Register a message handler for 'chat_message'
-    this.onMessage('chat_message', async (client, message) => {
-      console.log(`Received message from ${client.sessionId}: ${message.text}`);
+    // this.onMessage('chat_message', async (client, message) => {
+    //   console.log(`Received message from ${client.sessionId}: ${message.text}`);
 
-      // Push only the message text to the state
-      this.state.messages.push(message.text);  // Only push the text, not the entire object
+    //   // Push only the message text to the state
+    //   this.state.messages.push(message.text);  // Only push the text, not the entire object
 
-      // Broadcast the full message object (with user and text)
-      this.broadcast('chat_message', {
-        user: client.sessionId,
-        text: message.text,
-      });
+    //   // Broadcast the full message object (with user and text)
+    //   this.broadcast('chat_message', {
+    //     user: client.sessionId,
+    //     text: message.text,
+    //   });
 
-      // Send the message to ChatGPT API and get the response
-      const chatGptResponse = await this.getChatGptResponse(message.text);
+    //   // Send the message to ChatGPT API and get the response
+    //   const chatGptResponse = await this.getChatGptResponse(message.text);
 
-      // Broadcast the ChatGPT response as the fake user
-      this.broadcast('chat_message', {
-        user: 'Bot', // Username of the fake user
-        text: chatGptResponse,
-      });
-    });
+    //   // Broadcast the ChatGPT response as the fake user
+    //   this.broadcast('chat_message', {
+    //     user: 'Bot', // Username of the fake user
+    //     text: chatGptResponse,
+    //   });
+    // });
 
     // Register a message handler for updating the AI prompt
     this.onMessage('update_prompt', (client, message) => {
@@ -73,15 +73,20 @@ export class MyRoom extends Room<MyRoomState> {
 
     // Register a message handler for 'private_message'
     this.onMessage('private_message', (client, message) => {
-      console.log(`Received private message from ${client.sessionId} to ${message.userId}: ${message.text}`);
+      const fromPlayer  = client.sessionId;
+      const toPlayer = message.sendPlayerId;
+      const text = message.text;
+
+      console.log(`Received private message from ${fromPlayer} to ${toPlayer}: ${text}`);
       
       // Send the private message to the intended recipient
-      const recipient = this.clients.find(c => c.sessionId === message.userId);
+      const recipient = this.clients.find(c => c.sessionId === toPlayer);
       if (recipient) {
         recipient.send('private_message', {
-          user: client.sessionId,
+          user: fromPlayer,
           text: message.text,
         });
+        console.log(`Sent private message from ${fromPlayer} to ${toPlayer}, ${recipient}: ${text}`);
       }
     });
   }
