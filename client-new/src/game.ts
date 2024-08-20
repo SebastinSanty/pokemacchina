@@ -238,7 +238,7 @@ function createProximityBoxInstance(playerUsername: string) {
 
   const sendButton = document.createElement("button");
   sendButton.className = "btn btn-dark";
-  sendButton.innerText = "Send";
+  sendButton.innerHTML = '➤';
   chatInputGroup.appendChild(sendButton);
 
   document.body.appendChild(chatBox);
@@ -248,6 +248,12 @@ function createProximityBoxInstance(playerUsername: string) {
       if (chatInput.value.trim() !== "") {
           sendMessageToPlayer(playerUsername, chatInput.value.trim());
           chatInput.value = ''; // Clear input after sending
+      }
+  });
+
+  chatInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && chatInput.value.trim() !== "") {
+          sendButton.click(); // Trigger the send button click event
       }
   });
 
