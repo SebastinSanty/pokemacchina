@@ -124,8 +124,13 @@ function sendMessage(message: string) {
   }
 }
 
-function getPlayerIdFromUsername(playerUsername: string) {
-  return playerUsername.split(' ').pop();
+function getPlayerIdByUsername(username) {
+  for (let [playerId, player] of room.state.players) {
+      if (player.username === username) {
+          return playerId;
+      }
+  }
+  return null; // Return null if the username is not found
 }
 
 
@@ -134,9 +139,6 @@ function getPlayerIdFromUsername(playerUsername: string) {
 
 const activeChatBoxes = new Map<string, ReturnType<typeof createProximityBoxInstance>>(); // Store chat boxes by player username
 
-function getPlayerFromPlayerUsername(playerUsername: string) {
-  return room.state.players.find((player) => player.username === playerUsername);
-}
 
 // Listen for incoming chat messages
 room.onMessage('chat_message', (messageData) => {
@@ -151,6 +153,8 @@ function handleOutgoingPrivateMessage(sendingPlayer, messageData) {
   const player = room.state.players.get(toPlayerId);
   const playerUsername = player ? player.username : 'Unknown Player';
 
+  console.log(room.state.players, player, toPlayerId)
+
   let chatBoxInstance = activeChatBoxes.get(player);
   let chatMessages: Array<{ user: string; text: string }> = [];
 
@@ -159,7 +163,8 @@ function handleOutgoingPrivateMessage(sendingPlayer, messageData) {
 }
 
 function sendMessageToPlayer(playerUsername: string, message: string) {
-  const playerId = getPlayerIdFromUsername(playerUsername);
+  const playerId = getPlayerIdByUsername(playerUsername);
+  console.log("Player ID: ", playerId)
   console.log("Sent Message: ", message, " to ", playerId)
   if (room) {
     room.send('private_message', { sendPlayerId: playerId, text: message });

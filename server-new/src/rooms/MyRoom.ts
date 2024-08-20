@@ -25,6 +25,7 @@ export class MyRoomState extends Schema {
 export class MyRoom extends Room<MyRoomState> {
   maxClients = 4;
   private aiPrompt: string = 'You are a friendly and helpful bot in a multiplayer game.'; // Initial AI prompt
+  private fakeUsers: Set<string> = new Set();  // Set to store fake users' session IDs
 
   onCreate(options: any) {
     console.log('Room created!');
@@ -41,29 +42,6 @@ export class MyRoom extends Room<MyRoomState> {
         player.position.y = message.y;
       }
     });
-
-    // Register a message handler for 'chat_message'
-    // this.onMessage('chat_message', async (client, message) => {
-    //   console.log(`Received message from ${client.sessionId}: ${message.text}`);
-
-    //   // Push only the message text to the state
-    //   this.state.messages.push(message.text);  // Only push the text, not the entire object
-
-    //   // Broadcast the full message object (with user and text)
-    //   this.broadcast('chat_message', {
-    //     user: client.sessionId,
-    //     text: message.text,
-    //   });
-
-    //   // Send the message to ChatGPT API and get the response
-    //   const chatGptResponse = await this.getChatGptResponse(message.text);
-
-    //   // Broadcast the ChatGPT response as the fake user
-    //   this.broadcast('chat_message', {
-    //     user: 'Bot', // Username of the fake user
-    //     text: chatGptResponse,
-    //   });
-    // });
 
     // Register a message handler for updating the AI prompt
     this.onMessage('update_prompt', (client, message) => {
@@ -87,6 +65,16 @@ export class MyRoom extends Room<MyRoomState> {
           text: message.text,
         });
         console.log(`Sent private message from ${fromPlayer} to ${toPlayer}, ${recipient}: ${text}`);
+      } else if (this.fakeUsers.has(toPlayer)) {
+        console.log(`Fake user ${toPlayer} received a private message: ${text}`);
+        // Send the message to ChatGPT API and get the response
+        this.getChatGptResponse(text).then(chatGptResponse => {
+          // Reply to fromPlayer with the ChatGPT response
+          client.send('private_message', {
+            user: toPlayer,
+            text: chatGptResponse,
+          });
+        });
       }
     });
   }
@@ -142,6 +130,7 @@ export class MyRoom extends Room<MyRoomState> {
     fakePlayer.position.y = Math.floor(Math.random() * 100);
 
     this.state.players.set(fakeSessionId, fakePlayer);
+    this.fakeUsers.add(fakeSessionId);  // Add the fake user's session ID to the set
 
     console.log(`${fakePlayer.username} has been added to the room!`);
   }
