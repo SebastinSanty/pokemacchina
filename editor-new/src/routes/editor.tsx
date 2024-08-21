@@ -20,7 +20,7 @@ export default function DeveloperPortal() {
   const [loading, setLoading] = useState<number | null>(null); // State to manage loading
 
   // Initialize Colyseus.js client
-  const client = new Client('ws://localhost:2567'); // Adjust the URL and port as necessary
+  const client = new Client('/api'); // Adjust the URL and port as necessary
   const [room, setRoom] = useState(null);
 
   useEffect(() => {
