@@ -4,7 +4,14 @@ import { Schema, MapSchema, type } from "@colyseus/schema";
 import dotenv from 'dotenv';
 import axios, { AxiosError } from 'axios';  // Import Axios
 
+import { createClient } from '@supabase/supabase-js'
+
 dotenv.config();
+
+const supabaseUrl = 'https://bfawgabxukpfgcecxbmx.supabase.co'
+const supabaseKey = process.env.SUPABASE_KEY
+const supabase = createClient(supabaseUrl, supabaseKey)
+
 
 export class Vec2 extends Schema {
   @type("number") x: number;
@@ -24,17 +31,60 @@ export class MyRoomState extends Schema {
 
 export class MyRoom extends Room<MyRoomState> {
   maxClients = 4;
-  private aiPrompt: string = 'You are a friendly and helpful bot in a multiplayer game.'; // Initial AI prompt
   private fakeUsers: Set<string> = new Set();  // Set to store fake users' session IDs
 
   onCreate(options: any) {
     console.log('Room created!');
     this.setState(new MyRoomState());
 
-    // Add a fake user to the room with a username that follows the format of real users
-    this.addFakeUser();
+    // Fetch prompt data and create fake users
+    this.loadPromptsAndCreateFakeUsers();
 
-    // Register a message handler for 'move'
+    // Register message handlers
+    this.registerMessageHandlers();
+  }
+
+  async loadPromptsAndCreateFakeUsers() {
+    try {
+      const { data: prompts, error } = await supabase.from('prompts').select('*');
+
+      if (error) {
+        console.error('Error fetching prompts data:', error);
+        return;
+      }
+
+      if (prompts) {
+        prompts.forEach(prompt => {
+          this.addFakeUser(prompt);
+        });
+      }
+    } catch (err) {
+      console.error('An error occurred while loading prompts data:', err);
+    }
+  }
+
+  addFakeUser(prompt) {
+    const fakeSessionId = this.generateNumericSessionId();
+    const fakePlayer = new Player();
+    fakePlayer.username = prompt.bot_name || `Bot ${fakeSessionId}`;
+    fakePlayer.heroType = Math.floor(Math.random() * 12) + 1;
+    fakePlayer.position.x = Math.floor(Math.random() * 100);
+    fakePlayer.position.y = Math.floor(Math.random() * 100);
+
+    // Save the AI prompt for this fake user
+    const aiPrompt = prompt.bot_prompt || 'You are a friendly and helpful bot in a multiplayer game.';
+
+    this.state.players.set(fakeSessionId, fakePlayer);
+    this.fakeUsers.add(fakeSessionId);
+
+    console.log(`${fakePlayer.username} has been added to the room with prompt: ${aiPrompt}`);
+
+    // Optionally, store the prompt associated with this fake user
+    this.aiPrompt = aiPrompt;
+  }
+
+  // Register message handlers
+  registerMessageHandlers() {
     this.onMessage("move", (client, message) => {
       const player = this.state.players.get(client.sessionId);
       if (player) {
@@ -43,21 +93,18 @@ export class MyRoom extends Room<MyRoomState> {
       }
     });
 
-    // Register a message handler for updating the AI prompt
-    this.onMessage('update_prompt', (client, message) => {
-      this.aiPrompt = message.prompt;
-      console.log(`AI Prompt updated to: ${this.aiPrompt}`);
+    this.onMessage('reload_prompts', async (client, message) => {
+      console.log('Reloading prompts data...');
+      await this.loadPromptsAndCreateFakeUsers();
     });
 
-    // Register a message handler for 'private_message'
     this.onMessage('private_message', (client, message) => {
-      const fromPlayer  = client.sessionId;
+      const fromPlayer = client.sessionId;
       const toPlayer = message.sendPlayerId;
       const text = message.text;
 
       console.log(`Received private message from ${fromPlayer} to ${toPlayer}: ${text}`);
       
-      // Send the private message to the intended recipient
       const recipient = this.clients.find(c => c.sessionId === toPlayer);
       if (recipient) {
         recipient.send('private_message', {
@@ -67,9 +114,7 @@ export class MyRoom extends Room<MyRoomState> {
         console.log(`Sent private message from ${fromPlayer} to ${toPlayer}, ${recipient}: ${text}`);
       } else if (this.fakeUsers.has(toPlayer)) {
         console.log(`Fake user ${toPlayer} received a private message: ${text}`);
-        // Send the message to ChatGPT API and get the response
         this.getChatGptResponse(text).then(chatGptResponse => {
-          // Reply to fromPlayer with the ChatGPT response
           client.send('private_message', {
             user: toPlayer,
             text: chatGptResponse,
@@ -79,31 +124,35 @@ export class MyRoom extends Room<MyRoomState> {
     });
   }
 
+  generateNumericSessionId() {
+    return Math.floor(10000000 + Math.random() * 90000000).toString();
+  }
+
   async getChatGptResponse(userMessage: string): Promise<string> {
-    const maxRetries = 3;  // Maximum number of retries
-    const baseDelay = 1000; // Base delay in milliseconds
+    const maxRetries = 3;
+    const baseDelay = 1000;
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
             const response = await axios.post('https://api.openai.com/v1/chat/completions', {
-                model: 'gpt-3.5-turbo',  // Adjust the model as necessary
+                model: 'gpt-3.5-turbo',
                 messages: [
                     { role: 'system', content: this.aiPrompt },
                     { role: 'user', content: userMessage }
                 ],
-                max_tokens: 50  // Adjust the response length as needed
+                max_tokens: 50
             }, {
                 headers: {
-                    'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,  // Use the API key from environment variables
+                    'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
                     'Content-Type': 'application/json'
                 }
             });
 
             return response.data.choices[0].message.content.trim();
         } catch (error) {
-            if (axios.isAxiosError(error)) {  // Check if the error is an AxiosError
+            if (axios.isAxiosError(error)) {
                 if (error.response && error.response.status === 429) {
-                    const delay = baseDelay * Math.pow(2, attempt); // Exponential backoff
+                    const delay = baseDelay * Math.pow(2, attempt);
                     console.warn(`Rate limited by OpenAI. Retrying in ${delay}ms...`);
                     await new Promise(resolve => setTimeout(resolve, delay));
                 } else {
@@ -119,53 +168,29 @@ export class MyRoom extends Room<MyRoomState> {
 
     return "Sorry, I'm having trouble responding right now. Please try again later.";
   }
-
-  addFakeUser() {
-    const fakeSessionId = this.generateNumericSessionId();
-    const fakePlayer = new Player();
-    // fakePlayer.username = `#User ${fakeSessionId}`;
-    fakePlayer.username = `Bot`;
-    fakePlayer.heroType = Math.floor(Math.random() * 12) + 1;
-    fakePlayer.position.x = Math.floor(Math.random() * 100);
-    fakePlayer.position.y = Math.floor(Math.random() * 100);
-
-    this.state.players.set(fakeSessionId, fakePlayer);
-    this.fakeUsers.add(fakeSessionId);  // Add the fake user's session ID to the set
-
-    console.log(`${fakePlayer.username} has been added to the room!`);
-  }
-
-  generateNumericSessionId() {
-    // Generate an 8-digit numeric session ID
-    return Math.floor(10000000 + Math.random() * 90000000).toString();
-  }
-
+  
   onJoin(client: Client, options: any) {
     console.log(client.sessionId, 'joined!');
-  
-    // Check if the client is the editor
+
     if (options.isEditor) {
       console.log('Editor client connected, not creating a new player.');
-      return; // Skip creating a new player for the editor client
+      return;
     }
-  
-    // Create a new player for regular clients
+
     const player = new Player();
     player.username = client.auth?.username || `#User ${client.sessionId}`;
     player.heroType = Math.floor(Math.random() * 12) + 1;
     player.position.x = Math.floor(Math.random() * 100);
     player.position.y = Math.floor(Math.random() * 100);
     this.state.players.set(client.sessionId, player);
-  
-    // Broadcast updated player list
+
     this.broadcast('player_list', Array.from(this.state.players.keys()));
-  }  
+  }
 
   onLeave(client: Client, consented: boolean) {
     console.log(client.sessionId, 'left!');
     this.state.players.delete(client.sessionId);
 
-    // Broadcast updated player list
     this.broadcast('player_list', Array.from(this.state.players.keys()));
   }
 
