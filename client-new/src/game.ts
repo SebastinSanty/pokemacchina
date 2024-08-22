@@ -193,8 +193,8 @@ function handleIncomingPrivateMessage(messageData) {
 room.onMessage('private_message', handleIncomingPrivateMessage);
 
 function createProximityBoxInstance(playerUsername: string) {
-  const boxWidth = 300;
-  const boxHeight = 400;
+  const boxWidth = 320;
+  const boxHeight = 420;
   const padding = 5;
   const fontSize = 12;
 
@@ -234,6 +234,7 @@ function createProximityBoxInstance(playerUsername: string) {
   chatInput.type = "text";
   chatInput.className = "form-control";
   chatInput.placeholder = "Enter message";
+  chatInput.style.fontSize = `18px`;
   chatInputGroup.appendChild(chatInput);
 
   const sendButton = document.createElement("button");
@@ -270,13 +271,13 @@ function createProximityBoxInstance(playerUsername: string) {
           messageElement.style.margin = "4px 0";
           messageElement.style.borderRadius = "15px";
           messageElement.style.maxWidth = "70%";
-          messageElement.style.fontSize = `12px`;
+          // messageElement.style.fontSize = `12px`;
           messageElement.style.wordWrap = "break-word"; // Ensure text wraps within the bubble
           messageElement.style.width = "fit-content"; // Adjust the width based on content
 
           if (isSelf) {
               // Sent message styling (blue, right)
-              messageElement.style.backgroundColor = "#007bff"; // Blue background
+              messageElement.style.backgroundColor = "#763b36"; // Blue background
               messageElement.style.color = "white";
               messageElement.style.alignSelf = "flex-end"; // Align to the right
               messageElement.style.marginLeft = "auto"; // Ensure it's pushed to the right

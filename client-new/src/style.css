@@ -43,7 +43,53 @@ canvas {
 }
 
 .chat-bubble.self {
-  background-color: #0084ff;
+  background-color: #763b36;
   color: #ffffff;
 }
+
+
+/* style.css */
+
+.proximity-box {
+  background: #f5deb3; /* Light wheat color to simulate parchment */
+  border: 2px solid #763b36; /* Dark brown border to give an aged look */
+  border-radius: 10px; /* Slightly rounded corners */
+  box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.3); /* Soft shadow for depth */
+  font-family: 'Nanum Pen Script', Courier, monospace; /* Use a typewriter font for old text appearance */
+}
+
+.proximity-box::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: url('/parchment.jpg'); /* Replace with your parchment texture image */
+  opacity: 0.2; /* Adjust opacity for a subtle texture */
+  pointer-events: none; /* Prevent interference with other elements */
+}
+
+.card-title {
+  color: #763b36; /* Dark brown color for the title */
+  text-align: center;
+  font-size: 30px;
+}
+
+.card-text {
+  color: #4b2e0f; /* Darker brown for chat text */
+  font-size: 16px;
+}
+
+input.form-control {
+  background: #f5deb3; /* Match the input background with parchment */
+  border: 1px solid #763b36; /* Matching border */
+  color: #4b2e0f; /* Text color inside the input */
+}
+
+.btn-dark {
+  background: #763b36 !important;
+  border-color: #763b36 !important;
+}
+
 
