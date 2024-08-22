@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import * as Colyseus from 'colyseus.js';
 import { SignedIn, SignedOut, SignInButton } from '@clerk/clerk-react';
 import { Button, Box, Center, Container, Stack, Paper, Text } from '@mantine/core';
 import DeveloperPortal from './editor'; // Import the new component
@@ -8,26 +7,6 @@ const initialCode = `You are a friendly and helpful bot in a multiplayer game.`;
 
 export default function IndexPage() {
 
-  const [code, setCode] = useState(initialCode);
-  const client = new Colyseus.Client('/api'); // Adjust the WebSocket URL if needed
-  const [room, setRoom] = useState<Colyseus.Room | null>(null);
-
-  useEffect(() => {
-    // Join the room as an editor client as soon as the component mounts
-    const joinRoom = async () => {
-      const joinedRoom = await client.joinOrCreate('my_room', { isEditor: true });
-      setRoom(joinedRoom);
-    };
-
-    joinRoom();
-
-    // Cleanup function to leave the room when the component unmounts
-    return () => {
-      if (room) {
-        room.leave();
-      }
-    };
-  }, []);
 
   return (
     <header>

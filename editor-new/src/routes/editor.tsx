@@ -4,7 +4,6 @@ import { Button, Text, Group, AppShell, NavLink, Modal, TextInput, Accordion, Sw
 import { IconPlus, IconSettings, IconPokeball, IconCheck, IconX } from '@tabler/icons-react';
 import axios from 'axios';
 import { notifications } from '@mantine/notifications';
-import { Client } from 'colyseus.js'; // Import Colyseus.js
 
 import CodeMirror from '@uiw/react-codemirror';
 import { vscodeDark } from "@uiw/codemirror-theme-vscode";
@@ -19,25 +18,11 @@ export default function DeveloperPortal() {
   const [pokemons, setPokemons] = useState([]); 
   const [loading, setLoading] = useState<number | null>(null); // State to manage loading
 
-  // Initialize Colyseus.js client
-  const client = new Client('/api'); // Adjust the URL and port as necessary
-  const [room, setRoom] = useState(null);
-
   useEffect(() => {
-    // Join the room when the component mounts
-    client.joinOrCreate("my_room").then(roomInstance => {
-      setRoom(roomInstance);
-    }).catch(error => {
-      console.error("Failed to join room:", error);
-    });
-
-    return () => {
-      // Leave the room when the component unmounts
-      if (room) {
-        room.leave();
-      }
-    };
-  }, []);
+    if (user?.id) {
+      fetchPokemons(user.id);
+    }
+  }, [user]);
 
   const fetchPokemons = async (playerId) => {
     try {
@@ -49,12 +34,6 @@ export default function DeveloperPortal() {
         console.error('Failed to fetch Pokémon:', error);
     }
   };
-
-  useEffect(() => {
-    if (user?.id) {
-      fetchPokemons(user.id);
-    }
-  }, [user]);
 
   const handleCodeChange = (value, index) => {
     const updatedPokemons = [...pokemons];
@@ -91,11 +70,6 @@ export default function DeveloperPortal() {
         });
         setModalOpened(false);
         fetchPokemons(user.id);
-
-        // Notify the room to reload the data
-        if (room) {
-          room.send('reload_prompts');
-        }
       }
     } catch (error) {
       console.error('Failed to save Pokémon:', error);
@@ -126,11 +100,6 @@ export default function DeveloperPortal() {
           position: 'bottom-center',
         });
         fetchPokemons(user.id); 
-
-        // Notify the room to reload the data
-        if (room) {
-          room.send('reload_prompts');
-        }
       }
     } catch (error) {
       console.error('Failed to save instruction:', error);
@@ -161,11 +130,6 @@ export default function DeveloperPortal() {
           position: 'bottom-center',
         });
         fetchPokemons(user.id); 
-
-        // Notify the room to reload the data
-        if (room) {
-          room.send('reload_prompts');
-        }
       }
     } catch (error) {
       console.error('Failed to delete Pokémon:', error);
